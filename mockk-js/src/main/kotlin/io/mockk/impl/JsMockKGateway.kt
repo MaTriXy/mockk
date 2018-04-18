@@ -1,5 +1,6 @@
 package io.mockk.impl
 
+import io.mockk.MockKException
 import io.mockk.MockKGateway
 import io.mockk.MockKGateway.*
 import io.mockk.Ordering
@@ -36,12 +37,16 @@ class JsMockKGateway : MockKGateway {
 
 
     override val mockFactory: MockFactory = JsMockFactory(
-            stubRepo,
-            instantiator,
-            StubGatewayAccess({ callRecorder }, anyValueGenerator, stubRepo, safeLog))
+        stubRepo,
+        instantiator,
+        StubGatewayAccess({ callRecorder }, anyValueGenerator, stubRepo, safeLog)
+    )
 
     override val staticMockFactory: StaticMockFactory
         get() = throw UnsupportedOperationException("Static mocks are not supported in JS version")
+
+    override val objectMockFactory: ObjectMockFactory
+        get() = throw UnsupportedOperationException("Object mocks are not supported in JS version")
 
     override val clearer = CommonClearer(stubRepo, safeLog)
 
@@ -51,39 +56,43 @@ class JsMockKGateway : MockKGateway {
     val sequenceVerifier = SequenceCallVerifier(stubRepo, safeLog)
 
     override fun verifier(ordering: Ordering): CallVerifier =
-            when (ordering) {
-                Ordering.UNORDERED -> unorderedVerifier
-                Ordering.ALL -> allVerifier
-                Ordering.ORDERED -> orderedVerifier
-                Ordering.SEQUENCE -> sequenceVerifier
-            }
+        when (ordering) {
+            Ordering.UNORDERED -> unorderedVerifier
+            Ordering.ALL -> allVerifier
+            Ordering.ORDERED -> orderedVerifier
+            Ordering.SEQUENCE -> sequenceVerifier
+        }
 
     val callRecorderFactories = CallRecorderFactories(
-            { SignatureMatcherDetector({ ChainedCallDetector(safeLog) }) },
-            { CallRoundBuilder(safeLog) },
-            ::ChildHinter,
-            this::verifier,
-            { PermanentMocker(stubRepo, safeLog) },
-            ::VerificationCallSorter,
-            ::AnsweringState,
-            ::StubbingState,
-            ::VerifyingState,
-            ::StubbingAwaitingAnswerState,
-            ::SafeLoggingState)
+        { SignatureMatcherDetector({ ChainedCallDetector(safeLog) }) },
+        { CallRoundBuilder(safeLog) },
+        ::ChildHinter,
+        this::verifier,
+        { PermanentMocker(stubRepo, safeLog) },
+        ::VerificationCallSorter,
+        ::AnsweringState,
+        ::AnsweringStillAcceptingAnswersState,
+        ::StubbingState,
+        ::VerifyingState,
+        ::StubbingAwaitingAnswerState,
+        ::SafeLoggingState
+    )
 
     val commonCallRecorder: CommonCallRecorder = CommonCallRecorder(
-            stubRepo,
-            instantiator,
-            signatureValueGenerator,
-            mockFactory,
-            anyValueGenerator,
-            safeLog,
-            callRecorderFactories,
-            { recorder -> callRecorderFactories.answeringCallRecorderState(recorder) })
+        stubRepo,
+        instantiator,
+        signatureValueGenerator,
+        mockFactory,
+        anyValueGenerator,
+        safeLog,
+        callRecorderFactories,
+        { recorder -> callRecorderFactories.answeringState(recorder) })
     override val callRecorder: CallRecorder = commonCallRecorder
 
     override val stubber: Stubber = EveryBlockEvaluator({ callRecorder }, ::AutoHinter)
     override val verifier: Verifier = VerifyBlockEvaluator({ callRecorder }, stubRepo, ::AutoHinter)
+    override val mockInitializer: MockInitializer
+        get() = throw MockKException("MockK annotations are not supported in JS")
 
     companion object {
         private var log: Logger
@@ -100,13 +109,7 @@ class JsMockKGateway : MockKGateway {
 
         val defaultImplementation = JsMockKGateway()
         val defaultImplementationBuilder = { defaultImplementation }
-
-        inline fun <T> useImpl(block: () -> T): T {
-            MockKGateway.implementation = defaultImplementationBuilder
-            return block()
-        }
     }
-
 }
 
 

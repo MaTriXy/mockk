@@ -1,14 +1,16 @@
 package io.mockk.impl.verify
 
-import io.mockk.RecordedCall
 import io.mockk.MockKGateway
+import io.mockk.RecordedCall
 import io.mockk.impl.log.SafeLog
 import io.mockk.impl.stub.StubRepository
 import io.mockk.impl.verify.VerificationHelpers.allInvocations
 import io.mockk.impl.verify.VerificationHelpers.reportCalls
 
-class SequenceCallVerifier(val stubRepo: StubRepository,
-                           val safeLog: SafeLog) : MockKGateway.CallVerifier {
+class SequenceCallVerifier(
+    val stubRepo: StubRepository,
+    val safeLog: SafeLog
+) : MockKGateway.CallVerifier {
     private val captureBlocks = mutableListOf<() -> Unit>()
 
     override fun verify(verificationSequence: List<RecordedCall>, min: Int, max: Int): MockKGateway.VerificationResult {
@@ -16,7 +18,10 @@ class SequenceCallVerifier(val stubRepo: StubRepository,
 
         if (allCalls.size != verificationSequence.size) {
             return MockKGateway.VerificationResult(false, safeLog.exec {
-                "number of calls happened not matching exact number of verification sequence" + reportCalls(verificationSequence, allCalls)
+                "number of calls happened not matching exact number of verification sequence" + reportCalls(
+                    verificationSequence,
+                    allCalls
+                )
             })
         }
 

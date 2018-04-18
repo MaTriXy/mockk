@@ -2,8 +2,16 @@ package io.mockk
 
 import kotlinx.coroutines.experimental.runBlocking
 import java.lang.reflect.Method
-import java.util.*
+import kotlin.coroutines.experimental.Continuation
 import kotlin.reflect.KClass
+import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.KProperty1
+import kotlin.reflect.full.functions
+import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.javaField
+import kotlin.reflect.jvm.javaGetter
+import kotlin.reflect.jvm.javaMethod
+import kotlin.reflect.jvm.javaSetter
 
 actual object InternalPlatformDsl {
     actual fun identityHashCode(obj: Any): Int = System.identityHashCode(obj)
@@ -15,27 +23,27 @@ actual object InternalPlatformDsl {
     }
 
     actual fun Any?.toStr() =
-            try {
-                when (this) {
-                    null -> "null"
-                    is BooleanArray -> this.contentToString()
-                    is ByteArray -> this.contentToString()
-                    is CharArray -> this.contentToString()
-                    is ShortArray -> this.contentToString()
-                    is IntArray -> this.contentToString()
-                    is LongArray -> this.contentToString()
-                    is FloatArray -> this.contentToString()
-                    is DoubleArray -> this.contentToString()
-                    is Array<*> -> this.contentDeepToString()
-                    Void.TYPE.kotlin -> "void"
-                    is KClass<*> -> this.simpleName ?: "<null name class>"
-                    is Method -> name + "(" + parameterTypes.map { it.simpleName }.joinToString() + ")"
-                    is Function<*> -> "lambda {}"
-                    else -> toString()
-                }
-            } catch (thr: Throwable) {
-                "<error \"$thr\">"
+        try {
+            when (this) {
+                null -> "null"
+                is BooleanArray -> this.contentToString()
+                is ByteArray -> this.contentToString()
+                is CharArray -> this.contentToString()
+                is ShortArray -> this.contentToString()
+                is IntArray -> this.contentToString()
+                is LongArray -> this.contentToString()
+                is FloatArray -> this.contentToString()
+                is DoubleArray -> this.contentToString()
+                is Array<*> -> this.contentDeepToString()
+                Void.TYPE.kotlin -> "void"
+                is KClass<*> -> this.simpleName ?: "<null name class>"
+                is Method -> name + "(" + parameterTypes.map { it.simpleName }.joinToString() + ")"
+                is Function<*> -> "lambda {}"
+                else -> toString()
             }
+        } catch (thr: Throwable) {
+            "<error \"$thr\">"
+        }
 
     actual fun deepEquals(obj1: Any?, obj2: Any?): Boolean {
         return if (obj1 === obj2) {
@@ -64,4 +72,70 @@ actual object InternalPlatformDsl {
     }
 
     actual fun unboxChar(value: Any): Any = value
+
+    actual fun Any.toArray(): Array<*> =
+        when (this) {
+            is BooleanArray -> this.toTypedArray()
+            is ByteArray -> this.toTypedArray()
+            is CharArray -> this.toTypedArray()
+            is ShortArray -> this.toTypedArray()
+            is IntArray -> this.toTypedArray()
+            is LongArray -> this.toTypedArray()
+            is FloatArray -> this.toTypedArray()
+            is DoubleArray -> this.toTypedArray()
+            else -> this as Array<*>
+        }
+
+    actual fun classForName(name: String): Any = Class.forName(name).kotlin
+
+    actual fun dynamicCall(
+        self: Any,
+        methodName: String,
+        args: Array<out Any?>,
+        anyContinuationGen: () -> Continuation<*>
+    ): Any? {
+        val params = arrayOf(self, *args)
+        val func = self::class.functions.firstOrNull {
+            it.name == methodName &&
+                    it.parameters.size == params.size &&
+                    it.parameters.zip(params).all {
+                        val classifier = it.first.type.classifier
+                        if (classifier is KClass<*>) {
+                            classifier.isInstance(it.second)
+                        } else {
+                            false
+                        }
+                    }
+        } ?: throw MockKException("can't find function $methodName(${args.joinToString(", ")}) for dynamic call")
+
+        func.javaMethod?.isAccessible = true
+        if (func.isSuspend) {
+            return func.call(*params, anyContinuationGen())
+        } else {
+            return func.call(*params)
+        }
+    }
+
+    actual fun dynamicGet(self: Any, name: String): Any? {
+        val property = self::class.memberProperties
+            .filterIsInstance<KProperty1<Any, Any?>>()
+            .firstOrNull {
+                it.name == name
+            } ?: throw MockKException("can't find property $name for dynamic property get")
+
+        property.javaGetter?.isAccessible = true
+        return property.get(self)
+    }
+
+    actual fun dynamicSet(self: Any, name: String, value: Any?) {
+        val property = self::class.memberProperties
+            .filterIsInstance<KMutableProperty1<Any, Any?>>()
+            .firstOrNull {
+                it.name == name
+            } ?: throw MockKException("can't find property $name for dynamic property set")
+
+        property.javaSetter?.isAccessible = true
+        return property.set(self, value)
+    }
+
 }

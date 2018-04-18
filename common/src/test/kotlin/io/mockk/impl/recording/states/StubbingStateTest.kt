@@ -1,11 +1,7 @@
 package io.mockk.impl.recording.states
 
-import io.mockk.Called
-import io.mockk.MockKException
-import io.mockk.impl.every
-import io.mockk.impl.mockk
+import io.mockk.*
 import io.mockk.impl.recording.CommonCallRecorder
-import io.mockk.impl.verify
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -17,7 +13,7 @@ class StubbingStateTest {
 
     @BeforeTest
     fun setUp() {
-        recorder = mockk()
+        recorder = mockk(relaxed = true)
         state = StubbingState(recorder)
     }
 
@@ -30,17 +26,17 @@ class StubbingStateTest {
         }
 
         verify {
-            recorder.factories.stubbingAwaitingAnswerCallRecorderState wasNot Called
+            recorder.factories.stubbingAwaitingAnswerState wasNot Called
         }
     }
 
     @Test
     fun givenNonEmptyCallListInStubbingStateWhenRecordingDoneIsCalledThenStateSwitchedToAnswering() {
         every { recorder.calls.isEmpty() } returns false
-        every { recorder.factories.stubbingAwaitingAnswerCallRecorderState(any()) } returns mockk()
+        every { recorder.factories.stubbingAwaitingAnswerState(any()) } returns mockk(relaxed = true)
 
         state.recordingDone()
 
-        verify { recorder.factories.stubbingAwaitingAnswerCallRecorderState(any()) }
+        verify { recorder.factories.stubbingAwaitingAnswerState(any()) }
     }
 }

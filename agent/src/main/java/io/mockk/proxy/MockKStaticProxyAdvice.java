@@ -4,6 +4,7 @@ import net.bytebuddy.asm.Advice;
 import net.bytebuddy.asm.Advice.*;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 

@@ -1,16 +1,35 @@
 
 # Backlog
-- [ ] docs: logLevel
-- [ ] docs: relaxed (note: class cast may appear in generic, show detailed example)
-- [ ] docs: describe case when generic is not working as example
-- [ ] docs: what relaxed mock returns on enum
-- [ ] article on translaion Mockito to MockK
-- [ ] object mocking ruins singleton
+- [x] [#29](https://github.com/oleksiyp/mockk/issues/29) bug: any() matcher for java Class parameter fails with IllegalAccessError
+- [x] feature: dynamic calls (private calls)
+- [x] ***RELEASE MockK 1.7.6, 1.7.7***
+- [x] [#34](https://github.com/oleksiyp/mockk/pull/34) feature: JUnit5 extension (alike here https://github.com/oleksiyp/mockk/pull/23)
+- [x] [#31](https://github.com/oleksiyp/mockk/issues/31) feture: arbitry class mocks
+- [x] ***RELEASE MockK 1.7.8***
+- [x] feature: switch staticMockk from MocKKStub to SpyKStub
+- [x] ***RELEASE MockK 1.7.9***
+- [x] [#35](https://github.com/oleksiyp/mockk/issues/35) bug: StackOverflowException with HashMap
+- [x] ***RELEASE MockK 1.7.10***
+- [x] bug: broken JDK7 support
+- [x] ***RELEASE MockK 1.7.11***
+- [ ] [#28](https://github.com/oleksiyp/mockk/pull/28) feature: inject mockk
+- [ ] doc: describe captureLambda/captureCoroutine
+- [ ] doc: describe extension *properties*
+- [ ] bug: fix recording calls before validation, which is wrong in case it is failed
+- [ ] feature: Android Espresso integration
+- [ ] feature: Dagger component
+- [ ] feature: get rid of coroutine dependency
+- [ ] bug: forbid `verify { foo.service() wasNot Called }`
+- [ ] bug: check `verify { service.foo(assert {it.id == "wrongid"}) }` error message
+- [ ] think: how to fix `verify { spyHelper.handleMultipleSensors() wasNot Called }`
+- [ ] feature: dynamic calls for properties
+- [ ] feature: simpler access to private fields for mocking
+- [ ] article: translation Mockito <--> MockK
+- [ ] article: next few articles in series "Mocking is not Rocket Science"
 - [ ] feature: matching inside of data classes and arrays
-- [ ] **BIG** runs on Android devices
-- [ ] JavaDoc
-- [ ] annotation mocking
-- [ ] other JVMs
+- [ ] fix: get rid of implicit dependency on coroutine library
+- [ ] **BIG** feature: runs on Android devices
+- [ ] docs: more JavaDocs
 
 ## Geo
 
@@ -79,17 +98,3 @@ Beware Kotlin is popular in Germany, Japan, India, USA and Brasil
 - Mockito: (**new**) Advanced public API for framework integrations (Since 2.10.+)
 - Mockito: (**new**) New API for integrations: listening on verification start events (Since 2.11.+)
 
-
-DOCUMENTATION
-
-every {
-    recorder.safeExec<VerificationResult>(captureLambda())
-} answers {
-    lambda<() -> VerificationResult>().invoke()
-}
-
-
-io.mockk.shadowed.bytebuddy.renamed.java.lang.Object$ByteBuddy$1IsE2R23$ByteBuddy$wzI3lBlO cannot be cast to io.mockk.impl.recording.states.CallRecordingState
-java.lang.ClassCastException: io.mockk.shadowed.bytebuddy.renamed.java.lang.Object$ByteBuddy$1IsE2R23$ByteBuddy$wzI3lBlO cannot be cast to io.mockk.impl.recording.states.CallRecordingState
-	at io.mockk.impl.recording.states.VerifyingState.recordingDone(VerifyingState.kt:44)
-	at io.mockk.impl.recording.states.VerifyingStateTest.givenCallListInVerifyingStateWhenRecordingDoneThen(VerifyingStateTest.kt:52)

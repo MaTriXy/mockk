@@ -2,6 +2,10 @@
 
 [![Gitter](https://badges.gitter.im/mockk-io/Lobby.svg)](https://gitter.im/mockk-io/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge) [![Build Status](https://travis-ci.org/oleksiyp/mockk.svg?branch=master)](https://travis-ci.org/oleksiyp/mockk) [![Relase Version](https://img.shields.io/maven-central/v/io.mockk/mockk.svg?label=release)](http://search.maven.org/#search%7Cga%7C1%7Cmockk)  [![Change log](https://img.shields.io/badge/change%20log-%E2%96%A4-yellow.svg)](https://github.com/oleksiyp/mockk/releases) [![Back log](https://img.shields.io/badge/back%20log-%E2%96%A4-orange.svg)](/BACKLOG) [![codecov](https://codecov.io/gh/oleksiyp/mockk/branch/master/graph/badge.svg)](https://codecov.io/gh/oleksiyp/mockk) [![Documentation](https://img.shields.io/badge/documentation-%E2%86%93-yellowgreen.svg)](#nice-features)
 
+***thank you for using MockK!!!***
+
+![mockk usage](doc/stats-mockk.png)
+
 Table of contents:
 
 * auto-gen TOC:
@@ -9,6 +13,7 @@ Table of contents:
 
 ## Nice features
 
+ - annotations
  - mocking final classes and functions (via inlining)
  - pure Kotlin mocking DSL
  - matchers partial specification
@@ -16,13 +21,23 @@ Table of contents:
  - matcher expressions
  - mocking coroutines
  - capturing lambdas
- - extension function mocking
+ - object mocks
+ - private function mocking
+ - extension function mocking (static mocks)
+ - multiplatform support (JS support is highly experimental)
 
 ## Examples & articles
 
  - [kotlin-fullstack-sample](https://github.com/Kotlin/kotlin-fullstack-sample/pull/28/files#diff-eade18fbfd0abfb6338dbfa647b3215dR17) project covered with tests
  - [DZone article](https://dzone.com/articles/new-mocking-tool-for-kotlin-an-alternative-to-java)
  - [Habrahabr article](https://habrahabr.ru/post/341202/) (RU)
+ 
+#### Kotlin Academy <img src="https://cdn-images-1.medium.com/letterbox/47/47/50/50/1*FUXqI88mttV_kV8aTrKjOg.png?source=logoAvatar-1f9f77b4b3d1---e57b304801ef" width="20px" />
+
+ - [Mocking is not rocket science: Basics](https://blog.kotlin-academy.com/mocking-is-not-rocket-science-basics-ae55d0aadf2b)
+ - [Mocking is not rocket science: Expected behavior and behavior verification](https://blog.kotlin-academy.com/mocking-is-not-rocket-science-expected-behavior-and-behavior-verification-3862dd0e0f03)
+ - [Mocking is not rocket science: MockK features](https://blog.kotlin-academy.com/mocking-is-not-rocket-science-mockk-features-e5d55d735a98)
+
 ## Installation
 
 All you need to get started is just to add a dependency to `MockK` library.
@@ -34,7 +49,7 @@ All you need to get started is just to add a dependency to `MockK` library.
 <tr>
 <td width="100"><img src="doc/gradle.png" alt="Gradle"/></td>
 <td>
-    <pre>testCompile "io.mockk:mockk:1.6"</pre>
+    <pre>testCompile "io.mockk:mockk:1.7.15"</pre>
     </td>
 </tr>
 <tr>
@@ -43,7 +58,7 @@ All you need to get started is just to add a dependency to `MockK` library.
 <pre>&lt;dependency&gt;
     &lt;groupId&gt;io.mockk&lt;/groupId&gt;
     &lt;artifactId&gt;mockk&lt;/artifactId&gt;
-    &lt;version&gt;1.6&lt;/version&gt;
+    &lt;version&gt;1.7.15&lt;/version&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</pre>
     </td>
@@ -62,6 +77,86 @@ every { car.drive(Direction.NORTH) } returns Outcome.OK
 car.drive(Direction.NORTH) // returns OK
 
 verify { car.drive(Direction.NORTH) }
+```
+
+### Annotations
+
+You can use annotations to simplify creation of mock objects:
+
+```kotlin
+
+class TrafficSystem {
+  lateinit var car1: Car
+  
+  lateinit var car2: Car
+  
+  lateinit var car3: Car
+}
+
+class Test {
+  @MockK
+  lateinit var car1: Car
+
+  @RelaxedMockK
+  lateinit var car2: Car
+
+  @SpyK
+  val car3 = Car()
+  
+  @InjectMockKs
+  val trafficSystem = TrafficSystem()
+
+  @Before
+  fun setUp() = MockKAnnotations.init(this)
+
+  @Test
+  fun calculateAddsValues1() {
+      // ... use car1, car2 and car3
+  }
+}
+```
+
+Injection first tries to match properties by name, then by class or superclass. 
+Check `lookupType` parameter for customization. 
+
+Properties are injected even if `private` is applied. Constructors for injection are selected from the biggest 
+number of arguments to lowest.
+
+`@InjectMockKs` by default is injecting only `lateinit var`s or `var`s that are not assigned. 
+To change this use `overrideValues = true`. This would assign value even if it is already somehow initialized.
+To inject `val`s use `injectImmutable = true`. For shorter notation use `@OverrideMockKs` which do the same as 
+`@InjectMockKs` by default, but turns this two flags on.
+
+#### JUnit5
+
+In JUnit5 you can use MockKExtension to initialize mock. 
+
+```kotlin
+@ExtendWith(MockKExtension::class)
+class Test {
+  @MockK
+  lateinit var car1: Car
+
+  @RelaxedMockK
+  lateinit var car2: Car
+
+  @SpyK
+  val car3 = Car()
+
+  @Test
+  fun calculateAddsValues1() {
+    // ... use car1, car2 and car3
+  }
+}
+```
+
+Additionally it adds possibility to use`@MockK` and `@RelaxedMockK` on test function parameters:
+
+```kotlin
+@Test
+fun calculateAddsValues1(@MockK car1: Car, @RelaxedMockK car2: Car) {
+  // ... use car1 and car2
+}
 ```
 
 ### Spy
@@ -105,6 +200,82 @@ every { func() } returns Car() // or you can return mockk() for example
 func()
 ```
 
+### Object mocks
+
+Objects can be transformed to mocks following way:
+
+```
+object MockObj {
+  fun add(a: Int, b: Int) = a + b
+}
+
+objectMockk(MockObj).use {
+  assertEquals(3, MockObj.add(1, 2))
+
+  every { MockObj.add(1, 2) } returns 55
+
+  assertEquals(55, MockObj.add(1, 2))
+}
+
+```
+
+The use function is an utility for `mock` and `unmock` methods. If you need to mock an object outside of the `use` scope, you can do it with them:
+
+```
+@Before
+fun beforeTests() {
+    objectMockk(MockObj).mock()
+    every { MockObj.add(1,2) } returns 55
+}
+
+@Test
+fun willUseMockBehaviour() {
+    assertEquals(55, MockObj.add(1,2))
+}
+
+@After
+fun afterTests() {
+    objectMockk(MockObj).unmock()
+}
+
+
+```
+
+Despite Kotlin language limits you can create new instances of objects if testing logic needs that:
+```
+val newObjectMock = mockk<MockObj>()
+```
+
+### Class mock
+
+Sometimes you need mock of arbitary class. Use `classMockk` in this case.
+
+```kotlin
+val car = classMockk(Car::class)
+
+every { car.drive(Direction.NORTH) } returns Outcome.OK
+
+car.drive(Direction.NORTH) // returns OK
+
+verify { car.drive(Direction.NORTH) }
+```
+
+### Enumeration mocks
+
+Enums can be mocked using objectMockk:
+
+```
+enum class Enoom(val goodInt: Int) {
+    CONSTANT(35),
+    OTHER_CONSTANT(45);
+}
+
+objectMockk(Enoom.CONSTANT).use {
+    every { Enoom.CONSTANT.goodInt } returns 42
+    assertEquals(42, Enoom.CONSTANT.goodInt)
+}
+
+```
 
 ### Partial argument matching
 
@@ -260,10 +431,9 @@ verify {
 }
 ```
 
-### Returning nothing
+### Returning Unit
 
-If the function is returning Unit(i.e. no return value) you
-still need to specify `null` return value:
+If the function is returning `Unit` you can use `just Runs` construct:
 
 ```kotlin
 class MockedClass {
@@ -274,9 +444,6 @@ class MockedClass {
 
 val obj = mockk<MockedClass>()
 
-// all 3 are actually acceptable and doing the same
-every { obj.sum(any(), 1) } answers { nothing }
-every { obj.sum(any(), 2) } returns null
 every { obj.sum(any(), 3) } just Runs
 
 obj.sum(1, 1)
@@ -384,6 +551,44 @@ staticMockk("pkg.FileKt").use {
     }
 }
 ```
+### Private functions mocking / dynamic calls
+
+In case you have a need to mock private function, you can do it via dynamic call.
+```
+class Car {
+    fun drive() = accelerate()
+
+    private fun accelerate() = "going faster"
+}
+
+val mock = spyk<Car>()
+
+every { mock["accelerate"]() } returns "going not so fast"
+
+assertEquals("going not so fast", mock.drive())
+
+verifySequence {
+    mock.drive()
+    mock["accelerate"]()
+}
+```
+
+In case you want private calls to be verified, you should create spyk with `recordPrivateCalls = true`
+
+Additionally more verbose syntax allows to get and set properties, do same dynamic calls:
+
+```kotlin
+val mock = spyk(Team(), recordPrivateCalls = true)
+
+every { mock getProperty "speed" } returns 33
+every { mock setProperty "acceleration" value less(5) } just Runs
+every { mock invoke "openDoor" withArguments listOf("left", "rear") } returns "OK"
+
+verify { mock getProperty "speed" }
+verify { mock setProperty "acceleration" value less(5) }
+verify { mock invoke "openDoor" withArguments listOf("left", "rear") }
+
+```
 
 ### More interfaces
 
@@ -431,8 +636,9 @@ By default simple arguments are matched using `eq()`
 |`cmpEq(value)`|matches if value is equal to the provided via compareTo function|
 |`less(value)`|matches if value is less to the provided via compareTo function|
 |`more(value)`|matches if value is more to the provided via compareTo function|
-|`less(value, andEquals=true)`|matches if value is less or equals to the provided via compareTo function|
-|`more(value, andEquals=true)`|matches if value is more or equals to the provided via compareTo function|
+|`less(value, andEquals=false)`|matches if value is less or equals to the provided via compareTo function|
+|`more(value, andEquals=false)`|matches if value is more or equals to the provided via compareTo function|
+|`range(from, to, fromInclusive=true, toInclusive=true)`|matches if value is in range via compareTo function|
 |`and(left, right)`|combines two matchers via logical and|
 |`or(left, right)`|combines two matchers via logical or|
 |`not(matcher)`|negates the matcher|
@@ -475,6 +681,8 @@ Few special matchers available in verification mode only:
 
 ### Answers
 
+Answer can be followed by one or more additional answers.
+
 |Answer|Description|
 |------|-----------|
 |`returns value`|specify that matched call returns one specified value|
@@ -485,6 +693,21 @@ Few special matchers available in verification mode only:
 |`answers answerObj`|specify that matched call answers with Answer object|
 |`answers { nothing }`|specify that matched call answers null|
 |`just Runs`|specify that matched call is returning Unit (returns null)|
+
+### Additional answer
+
+Next answer is returned on each consequent call and last value is persisted.
+So this has similiar to `returnsMany` semantics.
+
+|Addititonal answer|Description|
+|------------------|-----------|
+|`andThen value`|specify that matched call returns one specified value|
+|`andThenMany list`|specify that matched call returns value from the list, returning each time next element|
+|`andThenThrows ex`|specify that matched call throws an exception|
+|`andThen { code }`|specify that matched call answers with code block scoped with `answer scope`|
+|`coAndThen { code }`|specify that matched call answers with coroutine code block  with `answer scope`|
+|`andThenAnswer answerObj`|specify that matched call answers with Answer object|
+|`andThen { nothing }`|specify that matched call answers null|
 
 ### Answer scope
 

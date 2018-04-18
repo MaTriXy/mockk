@@ -9,8 +9,8 @@ import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.dynamic.scaffold.TypeValidation;
 import net.bytebuddy.implementation.Implementation.Context.Disabled.Factory;
 import net.bytebuddy.matcher.ElementMatcher.Junction;
-import net.bytebuddy.matcher.ElementMatchers;
 
+import java.io.File;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
@@ -34,6 +34,7 @@ public class MockKInstrumentation implements ClassFileTransformer {
     private volatile Instrumentation instrumentation;
     private MockKProxyAdvice advice;
     private MockKStaticProxyAdvice staticAdvice;
+    private MockKHashMapStaticProxyAdvice staticHashMapAdvice; // workaround #35
 
     private final Set<Class<?>> classesToTransform = synchronizedSet(new HashSet<Class<?>>());
 
@@ -73,9 +74,11 @@ public class MockKInstrumentation implements ClassFileTransformer {
                     advice = new MockKProxyAdvice(handlers);
                     staticHandlers = new MockKWeakMap<Object, MockKInvocationHandler>();
                     staticAdvice = new MockKStaticProxyAdvice(staticHandlers);
+                    staticHashMapAdvice = new MockKHashMapStaticProxyAdvice(staticHandlers);
 
                     MockKDispatcher.set(advice.getId(), advice);
                     MockKDispatcher.set(staticAdvice.getId(), staticAdvice);
+                    MockKDispatcher.set(staticHashMapAdvice.getId(), staticHashMapAdvice);
                 }
             }
             new AdviceBuilder().build();
@@ -135,21 +138,33 @@ public class MockKInstrumentation implements ClassFileTransformer {
                     .visit(Advice.withCustomMapping()
                             .bind(MockKProxyAdviceId.class, advice.getId())
                             .to(MockKProxyAdvice.class).on(
-                                    isVirtual()
-                                            .and(not(isDefaultFinalizer()))
-                                            .and(not(isPackagePrivateJavaMethods()))))
+                                    isMethod()
+                                            .and(not(isStatic()))
+                                            .and(not(isDefaultFinalizer()))))
                     .visit(Advice.withCustomMapping()
-                            .bind(MockKProxyAdviceId.class, staticAdvice.getId())
-                            .to(MockKStaticProxyAdvice.class).on(
-                                    ElementMatchers.<MethodDescription>isStatic().and(not(isTypeInitializer())).and(not(isConstructor()))
-                                            .and(not(isPackagePrivateJavaMethods()))))
+                            .bind(MockKProxyAdviceId.class, staticProxyAdviceId(className))
+                            .to(staticProxyAdvice(className)).on(
+                                    isStatic()
+                                            .and(not(isTypeInitializer()))
+                                            .and(not(isConstructor()))
+                            ))
                     .make();
 
             return unloaded.getBytes();
         } catch (Throwable e) {
-            log.trace(e, "Failed to tranform class");
+            log.warn(e, "Failed to transform class");
             return null;
         }
+    }
+
+    private long staticProxyAdviceId(String className) {
+        // workaround #35
+        return className.equals("java/util/HashMap") ? staticHashMapAdvice.getId() : staticAdvice.getId();
+    }
+
+    private Class<? extends MockKProxyDispatcher> staticProxyAdvice(String className) {
+        // workaround #35
+        return className.equals("java/util/HashMap") ? MockKHashMapStaticProxyAdvice.class : MockKStaticProxyAdvice.class;
     }
 
     private static Junction<MethodDescription> isPackagePrivateJavaMethods() {
@@ -158,6 +173,10 @@ public class MockKInstrumentation implements ClassFileTransformer {
 
     public <T> void hook(T instance, MockKInvocationHandler handler) {
         handlers.put(instance, handler);
+    }
+
+    public <T> void unhook(T instance) {
+        handlers.remove(instance);
     }
 
     public void hookStatic(Class<?> clazz, MockKInvocationHandler handler) {

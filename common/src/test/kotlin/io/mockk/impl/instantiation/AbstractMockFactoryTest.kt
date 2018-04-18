@@ -1,13 +1,9 @@
 package io.mockk.impl.instantiation
 
-import io.mockk.CapturingSlot
+import io.mockk.*
 import io.mockk.impl.stub.Stub
-import io.mockk.impl.stub.StubRepository
-import io.mockk.impl.every
-import io.mockk.impl.mockk
-import io.mockk.impl.spyk
 import io.mockk.impl.stub.StubGatewayAccess
-import io.mockk.impl.verify
+import io.mockk.impl.stub.StubRepository
 import kotlin.reflect.KClass
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -23,11 +19,11 @@ class AbstractMockFactoryTest {
 
     @BeforeTest
     fun setUp() {
-        stubRepo = mockk()
-        instantiator = mockk()
-        gatewayAccess = mockk()
+        stubRepo = mockk(relaxed = true)
+        instantiator = mockk(relaxed = true)
+        gatewayAccess = mockk(relaxed = true)
         mockFactory = spyk(Factory())
-        mock = mockk()
+        mock = mockk(relaxed = true)
     }
 
     @Test
@@ -63,7 +59,7 @@ class AbstractMockFactoryTest {
             mockFactory.publicNewProxy<Mock>(any(), any(), any(), any(), any())
         } returns mock
 
-        val spyk = mockFactory.spyk(Mock::class, null, "name", arrayOf())
+        val spyk = mockFactory.spyk(Mock::class, null, "name", arrayOf(), false)
 
         assertSame(mock, spyk)
     }
@@ -74,7 +70,7 @@ class AbstractMockFactoryTest {
             mockFactory.publicNewProxy<Mock>(any(), any(), any(), any(), any())
         } returns mock
 
-        mockFactory.spyk(Mock::class, null, "name", arrayOf())
+        mockFactory.spyk(Mock::class, null, "name", arrayOf(), false)
 
         val stubSlot = CapturingSlot<Stub>()
         verify {
@@ -98,18 +94,22 @@ class AbstractMockFactoryTest {
     class Mock
 
     inner class Factory : AbstractMockFactory(stubRepo, instantiator, gatewayAccess) {
-        fun <T : Any> publicNewProxy(cls: KClass<out T>,
-                                     moreInterfaces: Array<out KClass<*>>,
-                                     stub: Stub,
-                                     useDefaultConstructor: Boolean,
-                                     instantiate: Boolean): T {
+        fun <T : Any> publicNewProxy(
+            cls: KClass<out T>,
+            moreInterfaces: Array<out KClass<*>>,
+            stub: Stub,
+            useDefaultConstructor: Boolean,
+            instantiate: Boolean
+        ): T {
             throw AssertionError("fail")
         }
 
-        override fun <T : Any> newProxy(cls: KClass<out T>,
-                                        moreInterfaces: Array<out KClass<*>>,
-                                        stub: Stub,
-                                        useDefaultConstructor: Boolean,
-                                        instantiate: Boolean): T = publicNewProxy(cls, moreInterfaces, stub, useDefaultConstructor, instantiate)
+        override fun <T : Any> newProxy(
+            cls: KClass<out T>,
+            moreInterfaces: Array<out KClass<*>>,
+            stub: Stub,
+            useDefaultConstructor: Boolean,
+            instantiate: Boolean
+        ): T = publicNewProxy(cls, moreInterfaces, stub, useDefaultConstructor, instantiate)
     }
 }

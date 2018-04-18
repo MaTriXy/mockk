@@ -1,8 +1,8 @@
 package io.mockk.impl.log
 
 import io.mockk.Called
-import io.mockk.impl.mockk
-import io.mockk.impl.verify
+import io.mockk.mockk
+import io.mockk.verify
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -14,8 +14,8 @@ class NoOpLoggerTest {
     @BeforeTest
     fun setUp() {
         logger = NoOpLogger()
-        msgLambda = mockk()
-        ex = mockk()
+        msgLambda = mockk(relaxed = true)
+        ex = mockk(relaxed = true)
     }
 
     @Test
@@ -35,7 +35,7 @@ class NoOpLoggerTest {
             listOf(ex, msgLambda) wasNot Called
         }
     }
-    
+
     @Test
     fun givenMessageLambdaWhenItIsPassedToWarnNoOpLoggerThenItsNotEvaluated() {
         logger.warn(msgLambda)
@@ -71,7 +71,7 @@ class NoOpLoggerTest {
             listOf(ex, msgLambda) wasNot Called
         }
     }
-    
+
     @Test
     fun givenMessageLambdaWhenItIsPassedToDebugNoOpLoggerThenItsNotEvaluated() {
         logger.debug(msgLambda)
@@ -89,7 +89,7 @@ class NoOpLoggerTest {
             listOf(ex, msgLambda) wasNot Called
         }
     }
-    
+
     @Test
     fun givenMessageLambdaWhenItIsPassedToTraceNoOpLoggerThenItsNotEvaluated() {
         logger.trace(msgLambda)

@@ -1,14 +1,12 @@
 package io.mockk.impl
 
 import io.mockk.InternalPlatformDsl
-import io.mockk.InternalPlatformDsl.toStr
 import io.mockk.MockKException
 import io.mockk.Ref
+import io.mockk.StackElement
 import io.mockk.impl.platform.CommonIdentityHashMapOf
 import io.mockk.impl.platform.CommonRef
 import io.mockk.impl.platform.JvmWeakConcurrentMap
-import io.mockk.impl.stub.StubRepository
-import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.*
 import java.util.Collections.synchronizedList
@@ -22,7 +20,7 @@ actual object InternalPlatform {
 
     actual fun ref(obj: Any): Ref = CommonRef(obj)
 
-    actual fun hkd(obj: Any): String = Integer.toUnsignedString(InternalPlatformDsl.identityHashCode(obj), 16)
+    actual fun hkd(obj: Any): String = Integer.toHexString(InternalPlatformDsl.identityHashCode(obj))
 
     actual fun isPassedByValue(cls: KClass<*>): Boolean {
         return when (cls) {
@@ -82,10 +80,12 @@ actual object InternalPlatform {
     actual fun prettifyRecordingException(ex: Throwable): Throwable {
         return when {
             ex is ClassCastException ->
-                MockKException("Class cast exception. " +
-                        "Probably type information was erased.\n" +
-                        "In this case use `hint` before call to specify " +
-                        "exact return type of a method. ", ex)
+                MockKException(
+                    "Class cast exception. " +
+                            "Probably type information was erased.\n" +
+                            "In this case use `hint` before call to specify " +
+                            "exact return type of a method. ", ex
+                )
 
             ex is NoClassDefFoundError &&
                     ex.message?.contains("kotlinx/coroutines/") ?: false ->
@@ -110,5 +110,18 @@ actual object InternalPlatform {
             }
         }
         copy(to, from, from::class.java)
+    }
+
+    actual fun captureStackTrace(): List<StackElement> {
+        val stack = Exception("Stack trace").stackTrace ?: return listOf()
+        return stack.map {
+            StackElement(
+                it.className ?: "-",
+                it.fileName ?: "-",
+                it.methodName ?: "-",
+                it.lineNumber,
+                it.isNativeMethod
+            )
+        }
     }
 }

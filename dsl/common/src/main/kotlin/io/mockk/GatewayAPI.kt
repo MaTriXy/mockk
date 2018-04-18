@@ -8,11 +8,13 @@ import kotlin.reflect.KClass
 interface MockKGateway {
     val mockFactory: MockFactory
     val staticMockFactory: StaticMockFactory
+    val objectMockFactory: ObjectMockFactory
     val stubber: Stubber
     val verifier: Verifier
     val callRecorder: CallRecorder
     val instanceFactoryRegistry: InstanceFactoryRegistry
     val clearer: Clearer
+    val mockInitializer: MockInitializer
 
     fun verifier(ordering: Ordering): CallVerifier
 
@@ -24,23 +26,29 @@ interface MockKGateway {
      * Create new mocks or spies
      */
     interface MockFactory {
-        fun <T : Any> mockk(mockType: KClass<T>,
-                            name: String?,
-                            relaxed: Boolean,
-                            moreInterfaces: Array<out KClass<*>>): T
+        fun <T : Any> mockk(
+            mockType: KClass<T>,
+            name: String?,
+            relaxed: Boolean,
+            moreInterfaces: Array<out KClass<*>>
+        ): T
 
-        fun <T : Any> spyk(mockType: KClass<T>?,
-                           objToCopy: T?,
-                           name: String?,
-                           moreInterfaces: Array<out KClass<*>>): T
-
+        fun <T : Any> spyk(
+            mockType: KClass<T>?,
+            objToCopy: T?,
+            name: String?,
+            moreInterfaces: Array<out KClass<*>>,
+            recordPrivateCalls: Boolean
+        ): T
 
         fun temporaryMock(mockType: KClass<*>): Any
+
+        fun isMock(value: Any): Boolean
     }
 
 
     /**
-     * Binds new static mocks
+     * Binds static mocks
      */
     interface StaticMockFactory {
         fun staticMockk(cls: KClass<*>)
@@ -49,39 +57,56 @@ interface MockKGateway {
     }
 
     /**
+     * Binds object mocks
+     */
+    interface ObjectMockFactory {
+        fun objectMockk(obj: Any, recordPrivateCalls: Boolean)
+
+        fun objectUnMockk(obj: Any)
+    }
+
+    /**
      * Clears mocks
      */
     interface Clearer {
-        fun clear(mocks: Array<out Any>,
-                  answers: Boolean,
-                  recordedCalls: Boolean,
-                  childMocks: Boolean)
+        fun clear(
+            mocks: Array<out Any>,
+            answers: Boolean,
+            recordedCalls: Boolean,
+            childMocks: Boolean
+        )
     }
 
     /**
      * Stub calls
      */
     interface Stubber {
-        fun <T> every(mockBlock: (MockKMatcherScope.() -> T)?,
-                      coMockBlock: (suspend MockKMatcherScope.() -> T)?): MockKStubScope<T>
+        fun <T> every(
+            mockBlock: (MockKMatcherScope.() -> T)?,
+            coMockBlock: (suspend MockKMatcherScope.() -> T)?
+        ): MockKStubScope<T>
     }
 
     /**
      * Verify calls
      */
     interface Verifier {
-        fun verify(params: VerificationParameters,
-                   mockBlock: (MockKVerificationScope.() -> Unit)?,
-                   coMockBlock: (suspend MockKVerificationScope.() -> Unit)?)
+        fun verify(
+            params: VerificationParameters,
+            mockBlock: (MockKVerificationScope.() -> Unit)?,
+            coMockBlock: (suspend MockKVerificationScope.() -> Unit)?
+        )
     }
 
     /**
      * Parameters of verification
      */
-    data class VerificationParameters(val ordering: Ordering,
-                                      val min: Int,
-                                      val max: Int,
-                                      val inverse: Boolean)
+    data class VerificationParameters(
+        val ordering: Ordering,
+        val min: Int,
+        val max: Int,
+        val inverse: Boolean
+    )
 
 
     /**
@@ -143,6 +168,10 @@ interface MockKGateway {
      */
     interface InstanceFactory {
         fun instantiate(cls: KClass<*>): Any?
+    }
+
+    interface MockInitializer {
+        fun initAnnotatedMocks(targets: List<Any>)
     }
 }
 

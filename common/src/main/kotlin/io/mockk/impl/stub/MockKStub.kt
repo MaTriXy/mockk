@@ -5,10 +5,13 @@ import io.mockk.impl.InternalPlatform
 import io.mockk.impl.InternalPlatform.customComputeIfAbsent
 import kotlin.reflect.KClass
 
-open class MockKStub(override val type: KClass<*>,
-                     override val name: String,
-                     val relaxed: Boolean = false,
-                     val gatewayAccess: StubGatewayAccess) : Stub {
+open class MockKStub(
+    override val type: KClass<*>,
+    override val name: String,
+    val relaxed: Boolean = false,
+    val gatewayAccess: StubGatewayAccess,
+    val recordPrivateCalls: Boolean
+) : Stub {
 
     private val answers = InternalPlatform.synchronizedMutableList<InvocationAnswer>()
     private val childs = InternalPlatform.synchronizedMutableMap<InvocationMatcher, Any>()
@@ -16,15 +19,26 @@ open class MockKStub(override val type: KClass<*>,
 
     lateinit var hashCodeStr: String
 
-    override fun addAnswer(matcher: InvocationMatcher, answer: Answer<*>) {
-        answers.add(InvocationAnswer(matcher, answer))
+    override fun addAnswer(matcher: InvocationMatcher, answer: Answer<*>): AdditionalAnswerOpportunity {
+        val invocationAnswer = InvocationAnswer(matcher, answer)
+        answers.add(invocationAnswer)
+
+        return AdditionalAnswerOpportunity({
+            synchronized(answers) {
+                invocationAnswer.answer
+            }
+        }, {
+            synchronized(answers) {
+                invocationAnswer.answer = it
+            }
+        })
     }
 
     override fun answer(invocation: Invocation): Any? {
         val invocationAndMatcher = synchronized(answers) {
             answers
-                    .reversed()
-                    .firstOrNull { it.matcher.match(invocation) }
+                .reversed()
+                .firstOrNull { it.matcher.match(invocation) }
                     ?: return defaultAnswer(invocation)
         }
 
@@ -32,19 +46,22 @@ open class MockKStub(override val type: KClass<*>,
             matcher.captureAnswer(invocation)
 
             val call = Call(
-                    invocation.method.returnType,
-                    invocation,
-                    matcher)
+                invocation.method.returnType,
+                invocation,
+                matcher
+            )
 
             answer.answer(call)
         }
     }
 
 
-    protected inline fun stdObjectFunctions(self: Any,
-                                            method: MethodDescription,
-                                            args: List<Any?>,
-                                            otherwise: () -> Any?): Any? {
+    protected inline fun stdObjectFunctions(
+        self: Any,
+        method: MethodDescription,
+        args: List<Any?>,
+        otherwise: () -> Any?
+    ): Any? {
         if (method.isToString()) {
             return toStr()
         } else if (method.isHashCode()) {
@@ -75,7 +92,14 @@ open class MockKStub(override val type: KClass<*>,
     }
 
     override fun recordCall(invocation: Invocation) {
-        recordedCalls.add(invocation)
+        val record = if (recordPrivateCalls)
+            true
+        else
+            !invocation.method.privateCall
+
+        if (record) {
+            recordedCalls.add(invocation)
+        }
     }
 
     override fun allRecordedCalls(): List<Invocation> {
@@ -91,10 +115,11 @@ open class MockKStub(override val type: KClass<*>,
             gatewayAccess.safeLog.exec {
                 childs.customComputeIfAbsent(matcher) {
                     gatewayAccess.mockFactory!!.mockk(
-                            childType,
-                            childName(this.name),
-                            moreInterfaces = arrayOf(),
-                            relaxed = relaxed)
+                        childType,
+                        childName(this.name),
+                        moreInterfaces = arrayOf(),
+                        relaxed = relaxed
+                    )
                 }
             }
         }
@@ -111,10 +136,12 @@ open class MockKStub(override val type: KClass<*>,
         }
     }
 
-    override fun handleInvocation(self: Any,
-                                  method: MethodDescription,
-                                  originalCall: () -> Any?,
-                                  args: Array<out Any?>): Any? {
+    override fun handleInvocation(
+        self: Any,
+        method: MethodDescription,
+        originalCall: () -> Any?,
+        args: Array<out Any?>
+    ): Any? {
         val originalPlusToString = {
             if (method.isToString()) {
                 toStr()
@@ -123,13 +150,43 @@ open class MockKStub(override val type: KClass<*>,
             }
         }
 
+
+        fun List<StackElement>.cutMockKCallProxyCall(): List<StackElement> {
+            fun List<StackElement>.search(cls: String, mtd: String): Int? {
+                return indexOfFirst {
+                    it.className == cls && it.methodName == mtd
+                }.let { if (it == -1) null else it }
+            }
+
+            val idx = search("io.mockk.proxy.MockKCallProxy", "call") ?: search(
+                "io.mockk.proxy.MockKProxyInterceptor",
+                "intercept"
+            ) ?: search("io.mockk.proxy.MockKProxyInterceptor", "interceptNoSuper") ?: return this
+
+            return this.drop(idx + 1)
+        }
+
+        fun List<StackElement>.unmangleByteBuddy(): List<StackElement> {
+            return map {
+                val idx = it.className.indexOf("\$ByteBuddy\$")
+                if (idx == -1)
+                    it
+                else
+                it.copy(className = it.className.substring(0, idx) + "(BB)")
+            }
+        }
+
         val invocation = Invocation(
-                self,
-                this,
-                method,
-                args.toList(),
-                InternalPlatform.time(),
-                originalPlusToString)
+            self,
+            this,
+            method,
+            args.toList(),
+            InternalPlatform.time(),
+            InternalPlatform.captureStackTrace()
+                .cutMockKCallProxyCall()
+                .unmangleByteBuddy(),
+            originalPlusToString
+        )
 
         return gatewayAccess.callRecorder().call(invocation)
     }
@@ -154,14 +211,17 @@ open class MockKStub(override val type: KClass<*>,
         fun MethodDescription.isEquals() = name == "equals" && paramTypes.size == 1 && paramTypes[0] == Any::class
     }
 
-    private data class InvocationAnswer(val matcher: InvocationMatcher, val answer: Answer<*>)
+    private data class InvocationAnswer(val matcher: InvocationMatcher, var answer: Answer<*>)
 
     protected fun Invocation.allEqMatcher() =
-            InvocationMatcher(self, method,
-                    args.map {
-                        if (it == null)
-                            NullCheckMatcher<Any>()
-                        else
-                            EqMatcher(it)
-                    }, false)
+        InvocationMatcher(
+            self,
+            method,
+            args.map {
+                if (it == null)
+                    NullCheckMatcher<Any>()
+                else
+                    EqMatcher(it)
+            }, false
+        )
 }
