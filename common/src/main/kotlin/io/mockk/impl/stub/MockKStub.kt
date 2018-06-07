@@ -12,12 +12,13 @@ open class MockKStub(
     val gatewayAccess: StubGatewayAccess,
     val recordPrivateCalls: Boolean
 ) : Stub {
-
     private val answers = InternalPlatform.synchronizedMutableList<InvocationAnswer>()
     private val childs = InternalPlatform.synchronizedMutableMap<InvocationMatcher, Any>()
     private val recordedCalls = InternalPlatform.synchronizedMutableList<Invocation>()
 
     lateinit var hashCodeStr: String
+
+    var disposeRoutine: () -> Unit = {}
 
     override fun addAnswer(matcher: InvocationMatcher, answer: Answer<*>): AdditionalAnswerOpportunity {
         val invocationAnswer = InvocationAnswer(matcher, answer)
@@ -48,7 +49,8 @@ open class MockKStub(
             val call = Call(
                 invocation.method.returnType,
                 invocation,
-                matcher
+                matcher,
+                invocation.fieldValueProvider
             )
 
             answer.answer(call)
@@ -140,7 +142,8 @@ open class MockKStub(
         self: Any,
         method: MethodDescription,
         originalCall: () -> Any?,
-        args: Array<out Any?>
+        args: Array<out Any?>,
+        fieldValueProvider: BackingFieldValueProvider
     ): Any? {
         val originalPlusToString = {
             if (method.isToString()) {
@@ -158,10 +161,10 @@ open class MockKStub(
                 }.let { if (it == -1) null else it }
             }
 
-            val idx = search("io.mockk.proxy.MockKCallProxy", "call") ?: search(
-                "io.mockk.proxy.MockKProxyInterceptor",
-                "intercept"
-            ) ?: search("io.mockk.proxy.MockKProxyInterceptor", "interceptNoSuper") ?: return this
+            val idx = search("io.mockk.proxy.MockKCallProxy", "call")
+                    ?: search("io.mockk.proxy.MockKProxyInterceptor", "intercept")
+                    ?: search("io.mockk.proxy.MockKProxyInterceptor", "interceptNoSuper")
+                    ?: return this
 
             return this.drop(idx + 1)
         }
@@ -172,9 +175,11 @@ open class MockKStub(
                 if (idx == -1)
                     it
                 else
-                it.copy(className = it.className.substring(0, idx) + "(BB)")
+                    it.copy(className = it.className.substring(0, idx) + "(BB)")
             }
         }
+
+        val stackTraceHolder = InternalPlatform.captureStackTrace()
 
         val invocation = Invocation(
             self,
@@ -182,10 +187,13 @@ open class MockKStub(
             method,
             args.toList(),
             InternalPlatform.time(),
-            InternalPlatform.captureStackTrace()
-                .cutMockKCallProxyCall()
-                .unmangleByteBuddy(),
-            originalPlusToString
+            {
+                stackTraceHolder()
+                    .cutMockKCallProxyCall()
+                    .unmangleByteBuddy()
+            },
+            originalPlusToString,
+            fieldValueProvider
         )
 
         return gatewayAccess.callRecorder().call(invocation)
@@ -224,4 +232,9 @@ open class MockKStub(
                     EqMatcher(it)
             }, false
         )
+
+    override fun dispose() {
+        clear(true, true, true)
+        disposeRoutine.invoke()
+    }
 }
