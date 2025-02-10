@@ -1,13 +1,8 @@
+---
+title: MockK Android support
+description: MockK supports regular unit tests, Android instrumented tests via subclassing(< Android P) and Android instrumented tests via inlining(≥ Android P)
+---
 ![mockk](doc/logo-site.png) ![kotlin](doc/robot.png)
-
-[![Gitter](https://badges.gitter.im/mockk-io/Lobby.svg)](https://gitter.im/mockk-io/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge)
-[![Build Status](https://travis-ci.org/mockk/mockk.svg?branch=master)](https://travis-ci.org/mockk/mockk)
-[![Relase Version](https://img.shields.io/maven-central/v/io.mockk/mockk.svg?label=release)](http://search.maven.org/#search%7Cga%7C1%7Cmockk)
-[![Change log](https://img.shields.io/badge/change%20log-%E2%96%A4-yellow.svg)](https://github.com/mockk/mockk/releases)
-[![Matrix tests](https://img.shields.io/badge/matrix-test-e53994.svg)](http://mockk.io/MATRIX)
-[![codecov](https://codecov.io/gh/mockk/mockk/branch/master/graph/badge.svg)](https://codecov.io/gh/mockk/mockk) 
-[![Documentation](https://img.shields.io/badge/documentation-%E2%86%93-yellowgreen.svg)](#nice-features) 
-[![GitHub stars](https://img.shields.io/github/stars/mockk/mockk.svg?label=stars)](https://github.com/mockk/mockk)
 
 ## Support
 
@@ -17,11 +12,15 @@ MockK supports:
  * Android instrumented tests via subclassing(< Android P)
  * Android instrumented tests via inlining(≥ Android P)
 
+## DexOpener
+
+To open classes before Android P you can use [DexOpener](https://github.com/tmurakami/dexopener), [example](https://github.com/tmurakami/dexopener/tree/master/examples/mockk)
+
 ## Implementation
 
-Implementation is based on [dexmaker](https://github.com/linkedin/dexmaker) project. With Anroid P instrumentation tests may use full power of inline instrumentation, so object mocks, static mocks and mocking of final classes are supported. Before Android P only subclassing can be employed and that means you need 'all-open' plugin.
+Implementation is based on [dexmaker](https://github.com/linkedin/dexmaker) project. With Android P, instrumentation tests may use full power of inline instrumentation, so object mocks, static mocks and mocking of final classes are supported. Before Android P, only subclassing can be employed, so you will need the 'all-open' plugin.
 
-Unfortunatelly public CIs alike Travis and Circle are not supporting emulation of Android P because of absense of ARM Anroid P images. Hope this will change soon
+Unfortunately, public CIs such as Travis and Circle are not supporting Android P emulation due to the absence of ARM Android P images. Hopefully, this will change soon.
  
 ## Supported features
 
@@ -30,7 +29,7 @@ Unfortunatelly public CIs alike Travis and Circle are not supporting emulation o
     <tr>
         <th>Feature</th>
         <th>Unit tests</th>
-        <th colspan="2">Instrumetation test</th>
+        <th colspan="2">Instrumentation test</th>
     </tr>
     <tr>
         <td></td>
@@ -49,7 +48,7 @@ Unfortunatelly public CIs alike Travis and Circle are not supporting emulation o
     <tr>
         <td>mocking final classes</td>
         <td>✓</td>
-        <td></td>
+        <td>can use DexOpener</td>
         <td>✓</td>
     </tr>
     <tr>
@@ -97,7 +96,7 @@ Unfortunatelly public CIs alike Travis and Circle are not supporting emulation o
     <tr>
         <td>private function mocking</td>
         <td>✓</td>
-        <td>✓</td>
+        <td></td>
         <td>✓</td>
     </tr>
     <tr>
@@ -123,7 +122,7 @@ Unfortunatelly public CIs alike Travis and Circle are not supporting emulation o
 
 ## Installation
 
-All you need to get started is just to add a dependency to `MockK` library.
+All you need to get started is by adding a dependency to `MockK` library.
 
 #### Unit tests
 
@@ -141,4 +140,4 @@ androidTestImplementation "io.mockk:mockk-android:{version}"
 
 ### Documentation
 
-Check [full documentation](http://mockk.io#markdown-toc) here
+Check [full documentation](https://mockk.io#markdown-toc) here
